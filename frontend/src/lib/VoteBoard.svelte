@@ -3,6 +3,7 @@
   export let outputs;
   export let votes;
   export let locked;
+  export let live = null;
 
   function cell(outputId, agentId) {
     return votes[outputId]?.[agentId] ?? null;
@@ -17,6 +18,14 @@
 </script>
 
 <div class="board">
+  {#if live}
+    <div class="liveonair">
+      <span class="who">🗣 {live.agent_name} · ronda {live.round}</span>
+      {#if live.text}
+        <p class="stream">{live.text}<span class="caret"></span></p>
+      {/if}
+    </div>
+  {/if}
   <table>
     <thead>
       <tr>
@@ -47,6 +56,8 @@
                 {#if c.justificacion}
                   <p class="intent">{c.justificacion}</p>
                 {/if}
+              {:else if live?.agent_id === a.id}
+                <span class="thinking"><i></i><i></i><i></i></span>
               {:else}
                 <span class="empty">—</span>
               {/if}
@@ -72,6 +83,62 @@
 <style>
   .board {
     overflow-x: auto;
+  }
+  .liveonair {
+    border: 1px solid #2c3237;
+    background: #14181b;
+    border-radius: 8px;
+    padding: 0.5rem 0.7rem;
+    margin-bottom: 0.6rem;
+  }
+  .who {
+    font-size: 0.75rem;
+    color: #46b06a;
+    font-weight: 600;
+  }
+  .stream {
+    margin: 0.25rem 0 0;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #cdd6df;
+    white-space: pre-wrap;
+  }
+  .caret {
+    display: inline-block;
+    width: 0.55em;
+    height: 1em;
+    background: #46b06a;
+    vertical-align: text-bottom;
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink {
+    to {
+      opacity: 0;
+    }
+  }
+  .thinking i {
+    display: inline-block;
+    width: 0.35rem;
+    height: 0.35rem;
+    margin-right: 0.25rem;
+    border-radius: 50%;
+    background: #46b06a;
+    animation: pulse 1.2s infinite;
+  }
+  .thinking i:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .thinking i:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 0.2;
+    }
+    50% {
+      opacity: 1;
+    }
   }
   table {
     width: 100%;

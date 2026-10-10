@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 
@@ -35,6 +36,7 @@ async def chat(request: Request):
     async def gen():
         for piece in ("Argumento: ", "mi postura es ", f"proponer {valor}."):
             yield f"data: {json.dumps(chunk({'content': piece}))}\n\n"
+            await asyncio.sleep(0.35)
         yield (
             "data: "
             + json.dumps(

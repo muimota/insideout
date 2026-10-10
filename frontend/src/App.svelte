@@ -16,6 +16,7 @@
   let deviceValues = $state({});
   let votes = $state({});
   let locked = $state({});
+  let live = $state(null);
   let verdict = $state(null);
   let busy = $state(false);
 
@@ -97,6 +98,7 @@
     deviceValues = {};
     votes = {};
     locked = {};
+    live = null;
     verdict = null;
     status = "";
     error = "";
@@ -110,6 +112,7 @@
     deviceValues = {};
     votes = {};
     locked = {};
+    live = null;
     phase = "running";
     status = "Iniciando simulación…";
     try {
@@ -154,12 +157,21 @@
           proposals: [],
           timeout: false,
         });
+        live = {
+          round: ev.round,
+          agent_id: ev.agent_id,
+          agent_name: ev.agent_name,
+          text: "",
+        };
         status = `Ronda ${ev.round}: turno de ${ev.agent_name}`;
         break;
       case "thought_token": {
         const r = rounds[rounds.length - 1];
         if (r && r.turns.length) {
           r.turns[r.turns.length - 1].thought += ev.text;
+        }
+        if (live && live.agent_id === ev.agent_id) {
+          live = { ...live, text: live.text + ev.text };
         }
         break;
       }
@@ -204,6 +216,7 @@
         status = `RESOLUCIÓN FORZADA: ${ev.output_name} = ${ev.valor}`;
         break;
       case "simulation_end":
+        live = null;
         verdict = ev;
         phase = "done";
         break;
@@ -338,7 +351,7 @@
   {#if rounds.length}
     <section>
       <h2>Pizarra de votos</h2>
-      <VoteBoard {agents} {outputs} {votes} {locked} />
+      <VoteBoard {agents} {outputs} {votes} {locked} {live} />
     </section>
     <section>
       <h2>Deliberación</h2>
