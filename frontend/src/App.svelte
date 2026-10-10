@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import VirtualDevices from "./lib/VirtualDevices.svelte";
   import Deliberation from "./lib/Deliberation.svelte";
+  import VoteBoard from "./lib/VoteBoard.svelte";
 
   const API = "http://localhost:8000";
 
@@ -13,6 +14,8 @@
   let error = $state("");
   let rounds = $state([]);
   let deviceValues = $state({});
+  let votes = $state({});
+  let locked = $state({});
   let verdict = $state(null);
   let busy = $state(false);
 
@@ -92,6 +95,8 @@
   async function resetAll() {
     rounds = [];
     deviceValues = {};
+    votes = {};
+    locked = {};
     verdict = null;
     status = "";
     error = "";
@@ -103,6 +108,8 @@
     verdict = null;
     rounds = [];
     deviceValues = {};
+    votes = {};
+    locked = {};
     phase = "running";
     status = "Iniciando simulación…";
     try {
@@ -161,6 +168,13 @@
         if (r && r.turns.length) {
           r.turns[r.turns.length - 1].proposals.push(ev);
         }
+        const prev = votes[ev.output_id]?.[ev.agent_id];
+        const from =
+          prev && String(prev.valor) !== String(ev.valor) ? prev.valor : null;
+        votes[ev.output_id] = {
+          ...(votes[ev.output_id] ?? {}),
+          [ev.agent_id]: { valor: ev.valor, from, round: ev.round },
+        };
         break;
       }
       case "turn_timeout": {
@@ -175,10 +189,12 @@
         break;
       case "consensus":
         deviceValues[ev.output_id] = ev.valor;
+        locked[ev.output_id] = { kind: "consensus", valor: ev.valor, round: ev.round };
         status = `CONSENSO en ${ev.output_name} = ${ev.valor} (ronda ${ev.round})`;
         break;
       case "forced_resolution":
         deviceValues[ev.output_id] = ev.valor;
+        locked[ev.output_id] = { kind: "forced", valor: ev.valor, round: ev.round };
         status = `RESOLUCIÓN FORZADA: ${ev.output_name} = ${ev.valor}`;
         break;
       case "simulation_end":
@@ -314,6 +330,10 @@
   {/if}
 
   {#if rounds.length}
+    <section>
+      <h2>Pizarra de votos</h2>
+      <VoteBoard {agents} {outputs} {votes} {locked} />
+    </section>
     <section>
       <h2>Deliberación</h2>
       <Deliberation {rounds} />
