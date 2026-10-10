@@ -35,11 +35,17 @@
           <th>{o.name}</th>
           {#each agents as a (a.id)}
             {@const c = cell(o.id, a.id)}
-            <td class:changed={c?.from != null}>
+            <td class:changed={c?.from != null} title={c?.justificacion || ""}>
               {#if c}
                 <strong>{c.valor}</strong>
                 {#if c.from != null}
                   <span class="flip">{c.from} → {c.valor}</span>
+                {/if}
+                {#if c.raw != null && String(c.raw) !== String(c.valor)}
+                  <span class="intent raw">intención: {c.raw}</span>
+                {/if}
+                {#if c.justificacion}
+                  <p class="intent">{c.justificacion}</p>
                 {/if}
               {:else}
                 <span class="empty">—</span>
@@ -110,6 +116,20 @@
     margin-top: 0.15rem;
     font-size: 0.75rem;
     color: #f1c40f;
+  }
+  .intent {
+    margin: 0.25rem 0 0;
+    font-size: 0.75rem;
+    color: #8b98a5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .intent.raw {
+    display: block;
+    color: #d08770;
+    font-style: italic;
   }
   .empty {
     color: #6b7681;

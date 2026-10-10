@@ -173,7 +173,13 @@
           prev && String(prev.valor) !== String(ev.valor) ? prev.valor : null;
         votes[ev.output_id] = {
           ...(votes[ev.output_id] ?? {}),
-          [ev.agent_id]: { valor: ev.valor, from, round: ev.round },
+          [ev.agent_id]: {
+            valor: ev.valor,
+            raw: ev.raw_valor,
+            justificacion: ev.justificacion,
+            from,
+            round: ev.round,
+          },
         };
         break;
       }
