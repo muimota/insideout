@@ -35,10 +35,11 @@ class InputDef(BaseModel):
 class OutputDef(BaseModel):
     id: str = Field(default_factory=lambda: uuid4().hex[:8])
     name: str
-    device_type: Literal["led", "servo", "nivel"]
-    enum_values: list[Any]
+    tipo: Literal["bool", "enum", "texto"] = "enum"
+    device_type: Optional[Literal["led", "servo", "nivel"]] = None
+    enum_values: Optional[list[Any]] = None
     description: str = ""
-    safe_value: Any
+    safe_value: Any = None
 
 
 class Simulation(BaseModel):

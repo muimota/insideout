@@ -13,7 +13,16 @@
 <div class="devices">
   {#each outputs as out (out.id)}
     <div class="device">
-      {#if out.device_type === "led"}
+      {#if out.tipo === "bool"}
+        <div class="toggle" class:on={values[out.id] === true}>
+          <div class="knob"></div>
+        </div>
+        <span class="device-name">{out.name}</span>
+        <span class="device-value">{values[out.id] === true ? "true" : values[out.id] === false ? "false" : "—"}</span>
+      {:else if out.tipo === "texto"}
+        <div class="texto">{values[out.id] || "(vacío)"}</div>
+        <span class="device-name">{out.name}</span>
+      {:else if out.device_type === "led"}
         <div class="led" class:on={values[out.id] && values[out.id] !== "OFF"}
           style={`--led-color: ${ledColors[values[out.id]] ?? ledColors.OFF}`}>
         </div>
@@ -34,6 +43,9 @@
             <div class="seg" class:on={values[out.id] >= v}></div>
           {/each}
         </div>
+        <span class="device-name">{out.name}</span>
+        <span class="device-value">{values[out.id] ?? "—"}</span>
+      {:else}
         <span class="device-name">{out.name}</span>
         <span class="device-value">{values[out.id] ?? "—"}</span>
       {/if}
@@ -115,5 +127,41 @@
   }
   .nivel .seg.on {
     background: #2ecc71;
+  }
+  .toggle {
+    width: 3.4rem;
+    height: 1.7rem;
+    border-radius: 1rem;
+    background: #3a3f44;
+    position: relative;
+    transition: background 0.3s;
+  }
+  .toggle .knob {
+    position: absolute;
+    top: 0.2rem;
+    left: 0.2rem;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    background: #f0f3f5;
+    transition: left 0.25s ease;
+  }
+  .toggle.on {
+    background: #2ecc71;
+  }
+  .toggle.on .knob {
+    left: 1.9rem;
+  }
+  .texto {
+    width: 8.5rem;
+    min-height: 2rem;
+    border: 1px solid #2c3237;
+    border-radius: 6px;
+    background: #161a1d;
+    padding: 0.4rem 0.5rem;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #46b06a;
+    word-break: break-word;
   }
 </style>

@@ -49,9 +49,10 @@ Abre http://localhost:5173
 
 1. Crea uno o más **agentes** (solo el prompt de personalidad).
 2. Crea **inputs** (bool/enum/texto) y fija su valor antes de jugar.
-3. Crea **outputs** (led/servo/nivel) con su descripción.
-4. Pulsa **Play** y observa el razonamiento en streaming, los votos y los
-   dispositivos virtuales.
+3. Crea **outputs** del mismo modo (bool/enum/texto); los enum usan un widget
+   de dispositivo virtual (led/servo/nivel).
+4. Pulsa **Play** y observa en la pizarra cómo convergen los votos (con
+   razonamiento en streaming), y los dispositivos virtuales.
 
 ## Desarrollo sin API key
 

@@ -64,6 +64,34 @@ def sanitize_value(valor: Any, enum_values: list[Any]) -> Any:
     return None
 
 
+BOOL_TRUE = {"true", "t", "si", "sí", "yes", "y", "1", "on"}
+BOOL_FALSE = {"false", "f", "no", "n", "0", "off"}
+
+
+def sanitize_bool(valor: Any) -> bool | None:
+    s = str(valor).strip().lower()
+    if s in BOOL_TRUE:
+        return True
+    if s in BOOL_FALSE:
+        return False
+    return None
+
+
+def sanitize_texto(valor: Any) -> str | None:
+    if valor is None:
+        return None
+    s = str(valor).strip()
+    return s or None
+
+
+def sanitize_output(valor: Any, out) -> Any | None:
+    if out.tipo == "bool":
+        return sanitize_bool(valor)
+    if out.tipo == "texto":
+        return sanitize_texto(valor)
+    return sanitize_value(valor, out.enum_values or [])
+
+
 def majority(values: list[Any]) -> Any | None:
     if not values:
         return None
@@ -177,7 +205,7 @@ class DeliberationEngine:
         if out is None:
             return
         raw = call.get("valor")
-        valor = sanitize_value(raw, out.enum_values)
+        valor = sanitize_output(raw, out)
         if valor is None:
             valor = out.safe_value
         justificacion = str(call.get("justificacion", ""))[:500]
@@ -259,9 +287,20 @@ class DeliberationEngine:
 
     def _system_prompt(self, agent) -> str:
         sim = self.sim
+
+        def valid_values(o) -> str:
+            if o.tipo == "bool":
+                return "— valores válidos: true / false"
+            if o.tipo == "texto":
+                return (
+                    "— valor libre de texto (breve); el CONSENSO exige que todos "
+                    "los agentes propongan exactamente el mismo texto"
+                )
+            return f"— valores válidos: {o.enum_values}"
+
         outputs_txt = "\n".join(
-            f'- "{o.id}" ({o.name}, dispositivo {o.device_type}): {o.description} '
-            f"— valores válidos: {o.enum_values}"
+            f'- "{o.id}" ({o.name}, dispositivo {o.device_type or "abstracto"}): '
+            f"{o.description} {valid_values(o)}"
             for o in sim.outputs
         )
         return (
@@ -282,8 +321,9 @@ class DeliberationEngine:
             f"- Si tras {sim.max_rondas} rondas no hay consenso, se aplica "
             "resolución por mayoría; el empate produce un estado de seguridad "
             "preconfigurado.\n"
-            "- Un valor fuera del enum se sanitiza a la opción válida más "
-            "cercana.\n\n"
+            "- Tu voto se normaliza: en enums se acepta la opción válida más "
+            "cercana, en bools se interpreta true/false, y en texto libre se "
+            "recortan espacios.\n\n"
             "## Outputs sobre los que deliberas\n"
             f"{outputs_txt}\n"
         )

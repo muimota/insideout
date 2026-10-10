@@ -22,7 +22,13 @@
 
   let newAgent = $state({ name: "", personality: "" });
   let newInput = $state({ name: "", tipo: "bool", enum_values: "", description: "" });
-  let newOutput = $state({ name: "", device_type: "led", description: "" });
+  let newOutput = $state({
+    name: "",
+    tipo: "enum",
+    device_type: "led",
+    enum_values: "",
+    description: "",
+  });
 
   onMount(load);
 
@@ -81,12 +87,28 @@
 
   async function addOutput() {
     if (!newOutput.name.trim()) return;
-    await call("/outputs", "POST", {
+    const body = {
       name: newOutput.name.trim(),
-      device_type: newOutput.device_type,
+      tipo: newOutput.tipo,
       description: newOutput.description.trim(),
-    });
-    newOutput = { name: "", device_type: "led", description: "" };
+    };
+    if (newOutput.tipo === "enum") {
+      if (newOutput.device_type) body.device_type = newOutput.device_type;
+      if (newOutput.enum_values.trim()) {
+        body.enum_values = newOutput.enum_values
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+    }
+    await call("/outputs", "POST", body);
+    newOutput = {
+      name: "",
+      tipo: "enum",
+      device_type: "",
+      enum_values: "",
+      description: "",
+    };
   }
 
   async function setInputValue(id, value) {
@@ -310,18 +332,32 @@
       {#each outputs as o (o.id)}
         <div class="item">
           <strong>{o.name}</strong>
-          <span class="muted">{o.device_type}: {o.enum_values.join(" | ")}</span>
+          <span class="muted">
+            {o.tipo === "enum"
+              ? (o.device_type || "enum") + ": " + (o.enum_values ?? []).join(" | ")
+              : o.tipo === "bool"
+                ? "bool: true | false"
+                : "texto"}
+          </span>
           <button class="icon" disabled={busy} onclick={() => call(`/outputs/${o.id}`, "DELETE")}>×</button>
           <p class="muted">{o.description}</p>
         </div>
       {/each}
       <div class="form">
         <input placeholder="nombre" bind:value={newOutput.name} />
-        <select bind:value={newOutput.device_type}>
-          <option value="led">led</option>
-          <option value="servo">servo</option>
-          <option value="nivel">nivel</option>
+        <select bind:value={newOutput.tipo}>
+          <option value="bool">bool</option>
+          <option value="enum">enum</option>
+          <option value="texto">texto</option>
         </select>
+        {#if newOutput.tipo === "enum"}
+          <select bind:value={newOutput.device_type}>
+            <option value="led">led</option>
+            <option value="servo">servo</option>
+            <option value="nivel">nivel</option>
+          </select>
+          <input placeholder="valores, separados por comas" bind:value={newOutput.enum_values} />
+        {/if}
         <input placeholder="descripción (la ve el agente)" bind:value={newOutput.description} />
         <button onclick={addOutput} disabled={busy}>+ Output</button>
       </div>

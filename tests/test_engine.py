@@ -2,7 +2,13 @@ import asyncio
 import re
 
 from backend.devices import VirtualDevice
-from backend.engine import DeliberationEngine, majority, sanitize_value
+from backend.engine import (
+    DeliberationEngine,
+    majority,
+    sanitize_bool,
+    sanitize_texto,
+    sanitize_value,
+)
 from backend.models import (
     DEVICE_ENUMS,
     Agent,
@@ -300,6 +306,92 @@ def test_sanitize_value_unitario():
     assert sanitize_value("50", DEVICE_ENUMS["servo"]) == 45
     assert sanitize_value(2.4, DEVICE_ENUMS["nivel"]) == 2
     assert sanitize_value("zzz", led_enum) is None
+
+
+def test_sanitize_bool_unitario():
+    assert sanitize_bool("TRUE") is True
+    assert sanitize_bool(True) is True
+    assert sanitize_bool(" off") is False
+    assert sanitize_bool(0) is False
+    assert sanitize_bool("quizás") is None
+
+
+def test_sanitize_texto_unitario():
+    assert sanitize_texto("  hola ") == "hola"
+    assert sanitize_texto("   ") is None
+    assert sanitize_texto(None) is None
+
+
+async def test_output_bool_consenso():
+    alarma = OutputDef(name="alarma", tipo="bool", safe_value=False)
+    led = OutputDef(
+        name="LED",
+        device_type="led",
+        enum_values=DEVICE_ENUMS["led"],
+        safe_value="AMBAR",
+    )
+    sim = make_sim(outputs=[alarma, led])
+    llm = MockLLM(
+        {
+            ("A0", 1): [propose(alarma.id, "true"), propose(led.id, "VERDE")],
+            ("A1", 1): [propose(alarma.id, "TRUE"), propose(led.id, "VERDE")],
+        }
+    )
+    events = await run_engine(sim, llm)
+    cons = find(events, "consensus")
+    assert [c["valor"] for c in cons] == [True, "VERDE"]
+    cmds = {c["output_id"]: c["valor"] for c in find(events, "command")}
+    assert cmds[alarma.id] is True
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "consensus" and end["round"] == 1
+
+
+async def test_output_bool_valor_invalido_vuelve_a_safe():
+    alarma = OutputDef(name="alarma", tipo="bool", safe_value=False)
+    sim = make_sim(outputs=[alarma])
+    llm = MockLLM(
+        {
+            ("A0", 1): [propose(alarma.id, "suministro eléctrico máximo")],
+            ("A1", 1): [propose(alarma.id, "false")],
+        }
+    )
+    events = await run_engine(sim, llm)
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "consensus"
+    assert find(events, "consensus")[0]["valor"] is False
+
+
+async def test_output_texto_consenso():
+    letrero = OutputDef(name="letrero", tipo="texto", safe_value="")
+    sim = make_sim(outputs=[letrero])
+    llm = MockLLM(
+        {
+            ("A0", 1): [propose(letrero.id, "ABRIR")],
+            ("A1", 1): [propose(letrero.id, "  ABRIR ")],
+        }
+    )
+    events = await run_engine(sim, llm)
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "consensus"
+    assert find(events, "consensus")[0]["valor"] == "ABRIR"
+
+
+async def test_output_texto_empate_safe_value():
+    letrero = OutputDef(name="letrero", tipo="texto", safe_value="SIN_DECISION")
+    sim = make_sim(outputs=[letrero])
+    llm = MockLLM(
+        {
+            ("A0", r): [propose(letrero.id, "ABRIR")] for r in (1, 2, 3)
+        }
+    )
+    llm.actions[("A1", 1)] = [propose(letrero.id, "CERRAR")]
+    llm.actions[("A1", 2)] = [propose(letrero.id, "CERRAR")]
+    llm.actions[("A1", 3)] = [propose(letrero.id, "CERRAR")]
+    events = await run_engine(sim, llm)
+    forced = find(events, "forced_resolution")[0]
+    assert forced["valor"] == "SIN_DECISION"
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "forced_resolution"
 
 
 def test_majority_unitario():
