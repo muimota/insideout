@@ -22,11 +22,14 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "output_id": {
                         "type": "string",
-                        "description": "Identificador del output sobre el que votas",
+                        "description": "Identificador exacto del output sobre el que votas (usa su id, no su nombre)",
                     },
                     "valor": {
                         "type": "string",
-                        "description": "Valor propuesto (uno de los valores válidos del output)",
+                        "description": (
+                            "Valor propuesto (uno de los valores válidos del output, "
+                            "o 'ABSTAIN' si decides abstenerte de votar sobre él)"
+                        ),
                     },
                     "justificacion": {
                         "type": "string",
@@ -37,7 +40,33 @@ TOOLS_SCHEMA = [
                 "additionalProperties": False,
             },
         },
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "abstain_output",
+            "description": (
+                "Indica formalmente que te abstienes de votar sobre este output porque "
+                "no compete a tu rol, personalidad o especialidad. Permite que los "
+                "demás agentes decidan sin tu bloqueo."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "output_id": {
+                        "type": "string",
+                        "description": "Identificador exacto del output sobre el que te abstienes",
+                    },
+                    "justificacion": {
+                        "type": "string",
+                        "description": "Motivo por el que consideras que no debes votar sobre este output",
+                    },
+                },
+                "required": ["output_id", "justificacion"],
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 
@@ -213,9 +242,12 @@ class DeliberationEngine:
             await self._reject_proposal(agent, call, round, output_id, blackboard)
             return
         raw = call.get("valor")
-        valor = sanitize_output(raw, out)
-        if valor is None:
-            valor = out.safe_value
+        if str(raw).strip().upper() == "ABSTAIN":
+            valor = "ABSTAIN"
+        else:
+            valor = sanitize_output(raw, out)
+            if valor is None:
+                valor = out.safe_value
         justificacion = str(call.get("justificacion", ""))[:500]
         votes[agent.id][out.id] = valor
         blackboard.append(
@@ -293,14 +325,19 @@ class DeliberationEngine:
         agent_ids = [a.id for a in self.sim.agents]
         for out in self.sim.outputs:
             vals = [votes[aid].get(out.id) for aid in agent_ids]
-            if any(v is None for v in vals) or len(set(vals)) != 1:
+            if any(v is None for v in vals):
+                return False
+            non_abstain = [v for v in vals if v != "ABSTAIN"]
+            if non_abstain and len(set(non_abstain)) != 1:
                 return False
         return True
 
     async def _finish(self, round: int, votes: dict, consensus: bool) -> None:
         if consensus:
             for out in self.sim.outputs:
-                valor = next(iter(votes[a.id][out.id] for a in self.sim.agents))
+                vals = [votes[a.id][out.id] for a in self.sim.agents]
+                non_abstain = [v for v in vals if v != "ABSTAIN"]
+                valor = non_abstain[0] if non_abstain else out.safe_value
                 await self.emit(
                     {
                         "type": "consensus",
@@ -322,7 +359,8 @@ class DeliberationEngine:
                 for a in self.sim.agents
                 if votes[a.id].get(out.id) is not None
             ]
-            valor = majority(vals)
+            non_abstain = [v for v in vals if v != "ABSTAIN"]
+            valor = majority(non_abstain)
             if valor is None:
                 valor = out.safe_value
             vote_counts = dict(Counter(vals))
@@ -344,11 +382,13 @@ class DeliberationEngine:
     async def _finish_decision(self, round: int, votes: dict) -> None:
         agent = self.sim.agents[0]
         for out in self.sim.outputs:
-            valor = votes[agent.id].get(out.id)
-            via = "voto"
-            if valor is None:
+            raw_val = votes[agent.id].get(out.id)
+            if raw_val is None or raw_val == "ABSTAIN":
                 valor = out.safe_value
-                via = "safe_value"
+                via = "abstencion" if raw_val == "ABSTAIN" else "safe_value"
+            else:
+                valor = raw_val
+                via = "voto"
             await self.emit(
                 {
                     "type": "decision",
@@ -392,11 +432,12 @@ class DeliberationEngine:
             reglas = (
                 "- Decides en solitario: no hay debate ni votación cruzada.\n"
                 "- En cada turno debes: (1) argumentar brevemente tu decisión en "
-                "texto y (2) llamar a la herramienta `propose_output` una vez POR "
-                "CADA output, usando su id exacto.\n"
-                "- `propose_output` solo registra tu decisión en la pizarra; el "
+                "texto y (2) registrar tu decisión para CADA output usando su id exacto:\n"
+                "  * Para proponer un valor, llama a `propose_output`.\n"
+                "  * Si consideras que un output no compete a tu rol o personalidad, puedes abstenerte llamando a `abstain_output` (o `propose_output` con valor 'ABSTAIN'). En ese caso adoptará su estado de seguridad.\n"
+                "- `propose_output` y `abstain_output` solo registran tu decisión en la pizarra; el "
                 "orquestador aplica al dispositivo el valor final.\n"
-                f"- Si en una ronda no votas todos los outputs, dispones de "
+                f"- Si en una ronda no decides todos los outputs, dispones de "
                 f"hasta {sim.max_rondas} rondas para completarlos; lo que quede "
                 "sin votar cae en su estado de seguridad preconfigurado.\n"
             )
@@ -409,14 +450,14 @@ class DeliberationEngine:
                 "- Junto a otros agentes decides el valor de los outputs "
                 "compartidos en rondas sucesivas de debate.\n"
                 "- En cada turno debes: (1) argumentar brevemente tu postura en "
-                "texto y (2) llamar a la herramienta `propose_output` una vez POR "
-                "CADA output, usando su id exacto.\n"
-                "- `propose_output` solo registra tu voto en la pizarra compartida; "
+                "texto y (2) registrar tu decisión para CADA output usando su id exacto:\n"
+                "  * Para proponer un valor, llama a `propose_output`.\n"
+                "  * Si consideras que un output no es de tu competencia, relevancia o especialidad, puedes abstenerte llamando a `abstain_output` (o `propose_output` con valor 'ABSTAIN'). Abstenerte permite que los demás agentes decidan sin tu bloqueo.\n"
+                "- `propose_output` y `abstain_output` solo registran tu postura en la pizarra compartida; "
                 "el orquestador aplica al dispositivo el valor final.\n"
-                "- Si todos los agentes proponen el mismo valor para un output, "
-                "hay CONSENSO y la deliberación termina inmediatamente.\n"
+                "- Hay CONSENSO cuando todos los agentes que no se abstienen coinciden en el mismo valor para un output (o si todos se abstienen, adoptando el estado de seguridad). En tal caso la deliberación termina inmediatamente.\n"
                 f"- Si tras {sim.max_rondas} rondas no hay consenso, se aplica "
-                "resolución por mayoría; el empate produce un estado de seguridad "
+                "resolución por mayoría entre los agentes no abstenidos; el empate o la abstención total produce un estado de seguridad "
                 "preconfigurado.\n"
             )
         return (
@@ -446,6 +487,9 @@ class DeliberationEngine:
             board = "\n".join(
                 f"- [R{m['round']}] {m['agent_name']} propuso {m['valor']} para "
                 f"{m['output_name']}: {m['justificacion']}"
+                if m.get("valor") != "ABSTAIN"
+                else f"- [R{m['round']}] {m['agent_name']} se abstuvo en "
+                f"{m['output_name']}: {m['justificacion']}"
                 for m in visible
             )
         elif self.solo:
@@ -453,11 +497,11 @@ class DeliberationEngine:
         else:
             board = "(la pizarra está vacía: eres el primero en hablar)"
         cierre = (
-            "Es tu turno: argumenta tu decisión y vota con `propose_output` "
-            "para cada output."
+            "Es tu turno: argumenta tu decisión y emite tu voto o abstención "
+            "(`propose_output` o `abstain_output`) para cada output."
             if self.solo
-            else "Es tu turno: argumenta tu postura y vota con `propose_output` "
-            "para cada output."
+            else "Es tu turno: argumenta tu postura y emite tu voto o abstención "
+            "(`propose_output` o `abstain_output`) para cada output."
         )
         return (
             f"## Ronda {round} de {sim.max_rondas}\n\n"

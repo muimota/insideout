@@ -521,3 +521,83 @@ async def test_voto_sobre_id_desconocido_no_bloquea_consenso():
     assert "no es un output" in inv[0]["motivo"]
     end = find(events, "simulation_end")[0]
     assert end["reason"] == "consensus" and end["round"] == 1
+
+
+async def test_abstencion_permite_consenso_inmediato():
+    sim = make_sim()
+    led = sim.outputs[0].id
+    llm = MockLLM(
+        {
+            ("A0", 1): [propose(led, "VERDE")],
+            ("A1", 1): [propose(led, "ABSTAIN", just="no es mi competencia")],
+        }
+    )
+    events = await run_engine(sim, llm)
+    cons = find(events, "consensus")
+    assert len(cons) == 1 and cons[0]["valor"] == "VERDE"
+    assert find(events, "command")[0]["valor"] == "VERDE"
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "consensus" and end["round"] == 1
+
+
+async def test_todos_se_abstienen_adopta_safe_value():
+    sim = make_sim()
+    led = sim.outputs[0].id
+    llm = MockLLM(
+        {
+            ("A0", 1): [propose(led, "ABSTAIN")],
+            ("A1", 1): [propose(led, "ABSTAIN")],
+        }
+    )
+    events = await run_engine(sim, llm)
+    cons = find(events, "consensus")
+    assert len(cons) == 1 and cons[0]["valor"] == "AMBAR"
+    assert find(events, "command")[0]["valor"] == "AMBAR"
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "consensus" and end["round"] == 1
+
+
+async def test_multiples_outputs_con_especializacion():
+    led = OutputDef(
+        name="LED",
+        enum_values=["OFF", "VERDE", "AMBAR", "ROJO"],
+        description="LED",
+        safe_value="AMBAR",
+    )
+    servo = OutputDef(
+        name="Servo", enum_values=[0, 45, 90], description="ángulo", safe_value=90
+    )
+    sim = make_sim(outputs=[led, servo])
+    llm = MockLLM(
+        {
+            # A0 es experto en iluminación, se abstiene del servo
+            ("A0", 1): [
+                propose(led.id, "VERDE"),
+                propose(servo.id, "ABSTAIN", just="no controlo mecánica"),
+            ],
+            # A1 es experto en mecánica, se abstiene de la iluminación
+            ("A1", 1): [
+                propose(led.id, "ABSTAIN", just="no controlo luces"),
+                propose(servo.id, 45),
+            ],
+        }
+    )
+    events = await run_engine(sim, llm)
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "consensus" and end["round"] == 1
+    cmds = {c["output_id"]: c["valor"] for c in find(events, "command")}
+    assert cmds == {led.id: "VERDE", servo.id: 45}
+
+
+async def test_mono_agente_abstencion_adopta_safe_value():
+    sim = make_sim(n_agents=1)
+    led = sim.outputs[0].id
+    llm = MockLLM({("A0", 1): [propose(led, "ABSTAIN")]})
+    events = await run_engine(sim, llm)
+    dec = find(events, "decision")
+    assert len(dec) == 1
+    assert dec[0]["valor"] == "AMBAR" and dec[0]["via"] == "abstencion"
+    assert find(events, "command")[0]["valor"] == "AMBAR"
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "decision" and end["round"] == 1
+

@@ -58,12 +58,15 @@ class LLMClient:
 
         calls: list[dict] = []
         for acc in tool_calls.values():
-            if acc["name"] != "propose_output":
+            name = acc.get("name")
+            if name not in ("propose_output", "abstain_output"):
                 continue
             try:
                 args = json.loads(acc["arguments"] or "{}")
             except json.JSONDecodeError:
                 continue
             if isinstance(args, dict):
+                if name == "abstain_output":
+                    args["valor"] = "ABSTAIN"
                 calls.append(args)
         yield {"type": "turn_complete", "tool_calls": calls}
