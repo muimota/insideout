@@ -115,6 +115,7 @@ class DeliberationEngine:
         self.llm = llm
         self.devices = devices
         self.emit = emit
+        self.solo = len(simulation.agents) == 1
 
     async def run(self) -> None:
         sim = self.sim
@@ -149,12 +150,18 @@ class DeliberationEngine:
                     await self._register_vote(agent, call, k, votes, blackboard)
 
                 if self._all_unanimous(votes):
-                    await self._finish(k, votes, consensus=True)
+                    if self.solo:
+                        await self._finish_decision(k, votes)
+                    else:
+                        await self._finish(k, votes, consensus=True)
                     return
 
             await self.emit({"type": "round_end", "round": k})
 
-        await self._finish(sim.max_rondas, votes, consensus=False)
+        if self.solo:
+            await self._finish_decision(sim.max_rondas, votes)
+        else:
+            await self._finish(sim.max_rondas, votes, consensus=False)
 
     async def _turno(
         self, agent, round: int, snapshot: dict, blackboard: list
@@ -334,6 +341,29 @@ class DeliberationEngine:
             {"type": "simulation_end", "round": round, "reason": "forced_resolution"}
         )
 
+    async def _finish_decision(self, round: int, votes: dict) -> None:
+        agent = self.sim.agents[0]
+        for out in self.sim.outputs:
+            valor = votes[agent.id].get(out.id)
+            via = "voto"
+            if valor is None:
+                valor = out.safe_value
+                via = "safe_value"
+            await self.emit(
+                {
+                    "type": "decision",
+                    "round": round,
+                    "output_id": out.id,
+                    "output_name": out.name,
+                    "valor": valor,
+                    "via": via,
+                }
+            )
+            await self.devices[out.id].apply(valor)
+        await self.emit(
+            {"type": "simulation_end", "round": round, "reason": "decision"}
+        )
+
     def _system_prompt(self, agent) -> str:
         sim = self.sim
 
@@ -341,6 +371,8 @@ class DeliberationEngine:
             if o.tipo == "bool":
                 return "— valores válidos: true / false"
             if o.tipo == "texto":
+                if self.solo:
+                    return "— valor libre de texto (breve)"
                 return (
                     "— valor libre de texto (breve); el CONSENSO exige que todos "
                     "los agentes propongan exactamente el mismo texto"
@@ -352,31 +384,54 @@ class DeliberationEngine:
             f"{o.description} {valid_values(o)}"
             for o in sim.outputs
         )
+        if self.solo:
+            intro = (
+                f'Eres "{agent.name}", el único agente del sistema: decides en '
+                "solitario el valor de los outputs compartidos.\n\n"
+            )
+            reglas = (
+                "- Decides en solitario: no hay debate ni votación cruzada.\n"
+                "- En cada turno debes: (1) argumentar brevemente tu decisión en "
+                "texto y (2) llamar a la herramienta `propose_output` una vez POR "
+                "CADA output, usando su id exacto.\n"
+                "- `propose_output` solo registra tu decisión en la pizarra; el "
+                "orquestador aplica al dispositivo el valor final.\n"
+                f"- Si en una ronda no votas todos los outputs, dispones de "
+                f"hasta {sim.max_rondas} rondas para completarlos; lo que quede "
+                "sin votar cae en su estado de seguridad preconfigurado.\n"
+            )
+        else:
+            intro = (
+                f'Eres "{agent.name}", un agente que participa en un sistema de '
+                "deliberación multiagente.\n\n"
+            )
+            reglas = (
+                "- Junto a otros agentes decides el valor de los outputs "
+                "compartidos en rondas sucesivas de debate.\n"
+                "- En cada turno debes: (1) argumentar brevemente tu postura en "
+                "texto y (2) llamar a la herramienta `propose_output` una vez POR "
+                "CADA output, usando su id exacto.\n"
+                "- `propose_output` solo registra tu voto en la pizarra compartida; "
+                "el orquestador aplica al dispositivo el valor final.\n"
+                "- Si todos los agentes proponen el mismo valor para un output, "
+                "hay CONSENSO y la deliberación termina inmediatamente.\n"
+                f"- Si tras {sim.max_rondas} rondas no hay consenso, se aplica "
+                "resolución por mayoría; el empate produce un estado de seguridad "
+                "preconfigurado.\n"
+            )
         return (
-            f'Eres "{agent.name}", un agente que participa en un sistema de '
-            "deliberación multiagente.\n\n"
+            f"{intro}"
             "## Tu personalidad (definida por el autor del experimento)\n"
             f"{agent.personality}\n\n"
             "## Reglas del sistema (inyectadas por la plataforma)\n"
-            "- Junto a otros agentes decides el valor de los outputs compartidos "
-            "en rondas sucesivas de debate.\n"
-            "- En cada turno debes: (1) argumentar brevemente tu postura en texto "
-            "y (2) llamar a la herramienta `propose_output` una vez POR CADA "
-            "output, usando su id exacto.\n"
-            "- `propose_output` solo registra tu voto en la pizarra compartida; "
-            "el orquestador aplica al dispositivo el valor final.\n"
-            "- Si todos los agentes proponen el mismo valor para un output, hay "
-            "CONSENSO y la deliberación termina inmediatamente.\n"
-            f"- Si tras {sim.max_rondas} rondas no hay consenso, se aplica "
-            "resolución por mayoría; el empate produce un estado de seguridad "
-            "preconfigurado.\n"
+            f"{reglas}"
             "- La telemetría (inputs) es de solo lectura: no se vota sobre "
             "inputs; vota únicamente sobre los outputs listados abajo, usando "
             "su id exacto.\n"
             "- Tu voto se normaliza: en enums se acepta la opción válida más "
             "cercana, en bools se interpreta true/false, y en texto libre se "
             "recortan espacios.\n\n"
-            "## Outputs sobre los que deliberas\n"
+            "## Outputs sobre los que decides\n"
             f"{outputs_txt}\n"
         )
 
@@ -393,14 +448,22 @@ class DeliberationEngine:
                 f"{m['output_name']}: {m['justificacion']}"
                 for m in visible
             )
+        elif self.solo:
+            board = "(la pizarra está vacía: aún no hay votos)"
         else:
             board = "(la pizarra está vacía: eres el primero en hablar)"
+        cierre = (
+            "Es tu turno: argumenta tu decisión y vota con `propose_output` "
+            "para cada output."
+            if self.solo
+            else "Es tu turno: argumenta tu postura y vota con `propose_output` "
+            "para cada output."
+        )
         return (
             f"## Ronda {round} de {sim.max_rondas}\n\n"
             "## Telemetría (instantánea congelada para esta ronda)\n"
             f"{telemetry}\n\n"
             f"## Pizarra compartida (últimos {sim.n_mensajes} mensajes)\n"
             f"{board}\n\n"
-            "Es tu turno: argumenta tu postura y vota con `propose_output` "
-            "para cada output."
+            f"{cierre}"
         )

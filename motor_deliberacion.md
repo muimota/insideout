@@ -49,6 +49,20 @@ Capa de orquestación (backend) que gestiona el loop de interacción entre agent
 
 Los agentes **no** tienen acceso directo al hardware (`set_output` se descarta porque rompería la deliberación): la herramienta solo registra el voto en la pizarra.
 
+## Modo agente único
+
+Con exactamente un agente no hay deliberación posible y no se aplica la
+maquinaria de consenso:
+
+- En cuanto vota todos los outputs, la simulación termina de inmediato con
+  eventos `decision` (uno por output, con `via: "voto"`) y
+  `simulation_end {reason: "decision"}`.
+- Si omite votos (omisión o timeout), las rondas actúan como reintento
+  (se conserva el voto anterior); al agotarse, lo no votado cae en su estado
+  de seguridad (`via: "safe_value"`).
+- El prompt del sistema no menciona otros agentes, CONSENSO ni mayoría: el
+  agente sabe que decide en solitario.
+
 ## Votos inválidos (inputs o ids desconocidos)
 
 `propose_output` con un `output_id` que no es un output **no** se descarta en

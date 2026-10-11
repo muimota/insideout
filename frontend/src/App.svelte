@@ -336,6 +336,17 @@
         roundLocked[ev.round] = snapshot(locked);
         status = `CONSENSO en ${ev.output_name} = ${ev.valor} (ronda ${ev.round})`;
         break;
+      case "decision":
+        deviceValues[ev.output_id] = ev.valor;
+        locked[ev.output_id] = {
+          kind: "decision",
+          valor: ev.valor,
+          round: ev.round,
+          via: ev.via,
+        };
+        roundLocked[ev.round] = snapshot(locked);
+        status = `DECISIÓN (agente único): ${ev.output_name} = ${ev.valor}`;
+        break;
       case "invalid_proposal": {
         const r = rounds[rounds.length - 1];
         if (r && r.turns.length) {
@@ -523,9 +534,11 @@
   </section>
 
   {#if verdict}
-    <section class="mt-4 rounded-lg px-4 py-[0.7rem] font-bold {verdict.reason === 'consensus' ? 'bg-consensus text-accent' : 'bg-warn-deep text-warn'}">
+    <section class="mt-4 rounded-lg px-4 py-[0.7rem] font-bold {verdict.reason === 'forced_resolution' ? 'bg-warn-deep text-warn' : 'bg-consensus text-accent'}">
       {#if verdict.reason === "consensus"}
         ✓ CONSENSO alcanzado en la ronda {verdict.round}
+      {:else if verdict.reason === "decision"}
+        ✓ Decisión individual (agente único) — ronda {verdict.round}
       {:else}
         ⚠ Sin consenso tras {verdict.round} rondas — resolución forzada
         (mayoría; empate → estado de seguridad)

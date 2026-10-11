@@ -82,8 +82,8 @@ uv run pytest -q
 ```
 
 Cubren el motor completo con LLM simulado: consenso, mayoría, empate →
-safe_value, silencio, sanitización, timeout, ventana de pizarra y rechazo
-de votos sobre inputs.
+safe_value, silencio, sanitización, timeout, ventana de pizarra, decisión
+individual (agente único) y rechazo de votos sobre inputs.
 
 ## Estructura
 

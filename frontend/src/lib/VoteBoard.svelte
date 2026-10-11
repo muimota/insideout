@@ -10,7 +10,7 @@
   }
 
   function unanimous(outputId) {
-    if (!agents.length) return false;
+    if (agents.length < 2) return false;
     const vals = agents.map((a) => cell(outputId, a.id)?.valor);
     if (vals.some((v) => v == null)) return false;
     return new Set(vals.map(String)).size === 1;
@@ -18,14 +18,18 @@
 
   function thClasses(lockKind) {
     const base = "border border-edge px-[0.6rem] py-[0.45rem] text-left align-top font-semibold";
-    const ring = lockKind === "consensus" ? " shadow-[inset_0_0_0_1px_#2ecc71]" : "";
+    const ring =
+      lockKind === "consensus" || lockKind === "decision"
+        ? " shadow-[inset_0_0_0_1px_#2ecc71]"
+        : "";
     return `${base} bg-panel text-body${ring}`;
   }
 
   function tdClasses(uni, lockKind) {
     const base = "border border-edge px-[0.6rem] py-[0.45rem] text-left align-top";
     let bg = "bg-inner";
-    if (lockKind === "consensus") bg = "bg-inner shadow-[inset_0_0_0_1px_#2ecc71]";
+    if (lockKind === "consensus" || lockKind === "decision")
+      bg = "bg-inner shadow-[inset_0_0_0_1px_#2ecc71]";
     else if (lockKind === "forced") bg = "bg-forced";
     else if (uni) bg = "bg-unanimous";
     return `${base} ${bg}`;
@@ -85,8 +89,20 @@
           <td class="border border-edge bg-inner px-[0.6rem] py-[0.45rem] text-left align-top whitespace-nowrap text-[0.8rem] text-soft">
             {#if lock?.kind === "consensus"}
               consenso · ronda {lock.round}
+            {:else if lock?.kind === "decision"}
+              {#if lock.via === "safe_value"}
+                decidido → {lock.valor} (estado de seguridad)
+              {:else}
+                decidido · ronda {lock.round}
+              {/if}
             {:else if lock?.kind === "forced"}
               forzado → {lock.valor}
+            {:else if agents.length === 1}
+              {#if cell(o.id, agents[0].id)}
+                votado
+              {:else}
+                sin voto
+              {/if}
             {:else if uni}
               unánime
             {:else}

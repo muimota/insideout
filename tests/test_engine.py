@@ -21,8 +21,10 @@ class MockLLM:
     def __init__(self, actions):
         self.actions = actions
         self.user_prompts = []
+        self.system_prompts = []
 
     async def run_turn(self, agent, system_prompt, user_prompt, tools, timeout):
+        self.system_prompts.append((agent.name, system_prompt))
         self.user_prompts.append((agent.name, user_prompt))
         round_ = int(re.search(r"Ronda (\d+) de", user_prompt).group(1))
         yield {"type": "thought_token", "text": f"[{agent.name}] pensando..."}
@@ -393,6 +395,70 @@ def test_majority_unitario():
     assert majority(["a", "b"]) is None
     assert majority([]) is None
     assert majority(["x"]) == "x"
+
+
+async def test_mono_agente_decide_en_ronda_1():
+    sim = make_sim(n_agents=1)
+    led = sim.outputs[0].id
+    llm = MockLLM({("A0", 1): [propose(led, "VERDE")]})
+    events = await run_engine(sim, llm)
+    dec = find(events, "decision")
+    assert len(dec) == 1
+    assert dec[0]["valor"] == "VERDE" and dec[0]["via"] == "voto"
+    assert find(events, "command")[0]["valor"] == "VERDE"
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "decision" and end["round"] == 1
+    assert "consensus" not in types_of(events)
+    assert "forced_resolution" not in types_of(events)
+
+
+async def test_mono_agente_reintenta_si_omite_output():
+    led = OutputDef(
+        name="LED",
+        enum_values=["OFF", "VERDE", "AMBAR", "ROJO"],
+        description="LED",
+        safe_value="AMBAR",
+    )
+    servo = OutputDef(
+        name="Servo", enum_values=[0, 45, 90], description="ángulo", safe_value=90
+    )
+    sim = make_sim(n_agents=1, outputs=[led, servo])
+    llm = MockLLM(
+        {
+            ("A0", 1): [propose(led.id, "VERDE")],
+            ("A0", 2): [propose(servo.id, 45)],
+        }
+    )
+    events = await run_engine(sim, llm)
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "decision" and end["round"] == 2
+    dec = {d["output_id"]: d["valor"] for d in find(events, "decision")}
+    assert dec == {led.id: "VERDE", servo.id: 45}
+
+
+async def test_mono_agente_nunca_vota_cae_en_safe_value():
+    sim = make_sim(n_agents=1)
+    llm = MockLLM({})
+    events = await run_engine(sim, llm)
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "decision" and end["round"] == 3
+    dec = find(events, "decision")[0]
+    assert dec["valor"] == "AMBAR" and dec["via"] == "safe_value"
+    assert find(events, "command")[0]["valor"] == "AMBAR"
+    assert "consensus" not in types_of(events)
+    assert "forced_resolution" not in types_of(events)
+
+
+async def test_mono_agente_prompt_sin_maquinaria_de_consensus():
+    sim = make_sim(n_agents=1)
+    led = sim.outputs[0].id
+    llm = MockLLM({("A0", 1): [propose(led, "VERDE")]})
+    await run_engine(sim, llm)
+    system = llm.system_prompts[0][1]
+    assert "en solitario" in system
+    assert "CONSENSO" not in system
+    assert "otros agentes" not in system
+    assert "solo lectura" in system
 
 
 async def test_voto_sobre_input_es_rechazado_y_avisado():
