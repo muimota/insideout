@@ -12,8 +12,6 @@ from .devices import VirtualDevice
 from .engine import DeliberationEngine
 from .llm_client import LLMClient
 from .models import (
-    DEVICE_ENUMS,
-    SAFE_DEFAULTS,
     Agent,
     InputDef,
     OutputDef,
@@ -49,7 +47,6 @@ class InputCreate(BaseModel):
 class OutputCreate(BaseModel):
     name: str
     tipo: Literal["bool", "enum", "texto"] = "enum"
-    device_type: Optional[Literal["led", "servo", "nivel"]] = None
     enum_values: Optional[list[Any]] = None
     description: str = ""
     safe_value: Any = None
@@ -144,18 +141,13 @@ def set_input_value(input_id: str, body: InputValue):
 
 
 def _default_output_payload(body: OutputCreate):
-    """Devuelve (tipo, device_type, enum_values, safe_value) ya validados."""
+    """Devuelve (tipo, enum_values, safe_value) ya validados."""
     tipo = body.tipo
     if tipo == "enum":
-        if body.enum_values:
-            enum_values = list(body.enum_values)
-        elif body.device_type:
-            enum_values = list(DEVICE_ENUMS[body.device_type])
-        else:
-            enum_values = None
+        enum_values = list(body.enum_values) if body.enum_values else None
         if not enum_values:
             raise HTTPException(
-                400, "Un output enum necesita device_type o enum_values no vacío"
+                400, "Un output enum necesita enum_values no vacío"
             )
     else:
         enum_values = None
@@ -167,23 +159,18 @@ def _default_output_payload(body: OutputCreate):
     else:
         safe = body.safe_value
         if safe is None:
-            safe = (
-                SAFE_DEFAULTS[body.device_type]
-                if body.device_type in SAFE_DEFAULTS
-                else enum_values[0]
-            )
+            safe = enum_values[0]
         if str(safe) not in [str(v) for v in enum_values]:
             raise HTTPException(400, f"safe_value fuera del enum: {enum_values}")
-    return tipo, body.device_type, enum_values, safe
+    return tipo, enum_values, safe
 
 
 @app.post("/outputs", status_code=201)
 def create_output(body: OutputCreate):
-    tipo, device_type, enum_values, safe = _default_output_payload(body)
+    tipo, enum_values, safe = _default_output_payload(body)
     out = OutputDef(
         name=body.name,
         tipo=tipo,
-        device_type=device_type,
         enum_values=enum_values,
         description=body.description,
         safe_value=safe,

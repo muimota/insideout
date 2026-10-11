@@ -48,8 +48,8 @@ Abre http://localhost:5173
 
 1. Crea uno o más **agentes** (solo el prompt de personalidad).
 2. Crea **inputs** (bool/enum/texto) y fija su valor antes de jugar.
-3. Crea **outputs** del mismo modo (bool/enum/texto); los enum usan un widget
-   de dispositivo virtual (led/servo/nivel).
+3. Crea **outputs** del mismo modo (bool/enum/texto); los enum muestran un
+   badge con el valor del actuador virtual.
 4. Pulsa **Play** y observa en la pizarra cómo convergen los votos (con
    razonamiento en streaming), y los dispositivos virtuales.
 

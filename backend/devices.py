@@ -27,7 +27,6 @@ class VirtualDevice(Device):
                 "type": "command",
                 "output_id": self.output.id,
                 "output_name": self.output.name,
-                "device_type": self.output.device_type,
                 "valor": valor,
             }
         )

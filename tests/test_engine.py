@@ -10,7 +10,6 @@ from backend.engine import (
     sanitize_value,
 )
 from backend.models import (
-    DEVICE_ENUMS,
     Agent,
     InputDef,
     OutputDef,
@@ -47,8 +46,7 @@ def make_sim(n_agents=2, timeout=30.0, n_mensajes=4, outputs=None):
     outs = outputs or [
         OutputDef(
             name="LED",
-            device_type="led",
-            enum_values=DEVICE_ENUMS["led"],
+            enum_values=["OFF", "VERDE", "AMBAR", "ROJO"],
             description="LED del laboratorio",
             safe_value="AMBAR",
         )
@@ -202,8 +200,7 @@ async def test_sanitize_fuera_de_enum_cae_en_safe():
 async def test_servo_escalares_numericos():
     servo = OutputDef(
         name="Servo",
-        device_type="servo",
-        enum_values=DEVICE_ENUMS["servo"],
+        enum_values=[0, 45, 90],
         description="ángulo",
         safe_value=90,
     )
@@ -258,15 +255,13 @@ async def test_ventana_deslizante_pizarra():
 async def test_multiples_outputs_early_exit_parcial():
     led = OutputDef(
         name="LED",
-        device_type="led",
-        enum_values=DEVICE_ENUMS["led"],
+        enum_values=["OFF", "VERDE", "AMBAR", "ROJO"],
         description="LED",
         safe_value="AMBAR",
     )
     servo = OutputDef(
         name="Servo",
-        device_type="servo",
-        enum_values=DEVICE_ENUMS["servo"],
+        enum_values=[0, 45, 90],
         description="ángulo",
         safe_value=90,
     )
@@ -299,12 +294,12 @@ async def test_multiples_outputs_early_exit_parcial():
 
 
 def test_sanitize_value_unitario():
-    led_enum = DEVICE_ENUMS["led"]
+    led_enum = ["OFF", "VERDE", "AMBAR", "ROJO"]
     assert sanitize_value("verde", led_enum) == "VERDE"
     assert sanitize_value("VERDE", led_enum) == "VERDE"
     assert sanitize_value("verdee", led_enum) == "VERDE"
-    assert sanitize_value("50", DEVICE_ENUMS["servo"]) == 45
-    assert sanitize_value(2.4, DEVICE_ENUMS["nivel"]) == 2
+    assert sanitize_value("50", [0, 45, 90]) == 45
+    assert sanitize_value(2.4, [1, 2, 3, 4, 5]) == 2
     assert sanitize_value("zzz", led_enum) is None
 
 
@@ -326,8 +321,7 @@ async def test_output_bool_consenso():
     alarma = OutputDef(name="alarma", tipo="bool", safe_value=False)
     led = OutputDef(
         name="LED",
-        device_type="led",
-        enum_values=DEVICE_ENUMS["led"],
+        enum_values=["OFF", "VERDE", "AMBAR", "ROJO"],
         safe_value="AMBAR",
     )
     sim = make_sim(outputs=[alarma, led])

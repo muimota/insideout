@@ -299,7 +299,7 @@ class DeliberationEngine:
             return f"— valores válidos: {o.enum_values}"
 
         outputs_txt = "\n".join(
-            f'- "{o.id}" ({o.name}, dispositivo {o.device_type or "abstracto"}): '
+            f'- "{o.id}" ({o.name}): '
             f"{o.description} {valid_values(o)}"
             for o in sim.outputs
         )

@@ -19,7 +19,7 @@ comando final a los dispositivos.
 | LLM | Protocolo **OpenAI** en todo el código (nunca "openrouter"). `base_url`, `model`, `api_key` en `.env` (gitignored) + `.env.example` |
 | Visibilidad | **Fase 1: todos los agentes ven todos los inputs y outputs** (sin grafo). Fase 2: grafo como restricción de visibilidad |
 | Inputs virtuales | El **usuario fija su valor en la UI** antes de play (toggle/selector/texto). El snapshot se congela al iniciar la simulación |
-| Outputs | Siempre **enums discretos** por tipo de dispositivo: LED `["OFF","VERDE","AMBAR","ROJO"]`, Servo `[0,45,90]`, Nivel `[1,2,3,4,5]`. Cada output tiene `descripción` y `safe_value` (estado ante conflicto) |
+| Outputs | Enums discretos definidos **explícitamente por el autor del experimento** (ej. LED `["OFF","VERDE","AMBAR","ROJO"]`, servo `[0,45,90]`). Cada output enum tiene `enum_values`, `descripción` y `safe_value` (estado ante conflicto; por defecto el primer valor del enum) |
 | Dispositivos | Abstracción `Device`: fase 1 = **virtuales en el navegador**; fase 3 = ESP32 físico por WebSocket sin cambiar el resto |
 | Consenso | **Unánime por output** → early exit cuando todos los outputs están acordados. Sin unanimidad tras `max_rondas`: **mayoría simple por output; empate o sin mayoría → `safe_value`** (estado de conflicto) |
 | Motor | Implementación propia en Python asíncrono (~300 líneas). Sin frameworks de agentes |
@@ -55,7 +55,7 @@ code/
 - **Agent**: `{id, nombre, personalidad}` — opcionalmente `model` propio.
 - **InputDef**: `{id, nombre, tipo: bool|enum|texto, enum_valores?, descripción, valor}`
   (valor fijado por el usuario antes de play).
-- **OutputDef**: `{id, nombre, tipo_dispositivo: led|servo|nivel, enum_valores, descripción, safe_value}`.
+- **OutputDef**: `{id, nombre, tipo: bool|enum|texto, enum_valores (solo enum), descripción, safe_value}`.
 - **Simulation**: `{agentes[], inputs[], outputs[], max_rondas, n_mensajes_visibles, timeout_turno}`.
 
 ## 5. Motor (generalizado a N agentes × M outputs)
