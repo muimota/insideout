@@ -393,3 +393,65 @@ def test_majority_unitario():
     assert majority(["a", "b"]) is None
     assert majority([]) is None
     assert majority(["x"]) == "x"
+
+
+async def test_voto_sobre_input_es_rechazado_y_avisado():
+    sim = make_sim()
+    led = sim.outputs[0].id
+    sensor = sim.inputs[0].name
+    llm = MockLLM(
+        {
+            ("A0", 1): [propose(sensor, "false")],
+            ("A1", 1): [propose(led, "VERDE")],
+            ("A0", 2): [propose(led, "VERDE")],
+        }
+    )
+    events = await run_engine(sim, llm)
+    inv = find(events, "invalid_proposal")
+    assert len(inv) == 1
+    assert inv[0]["agent_name"] == "A0" and inv[0]["output_id"] == sensor
+    assert "solo lectura" in inv[0]["motivo"]
+    assert "input" in inv[0]["motivo"]
+    props_a0 = [p for p in find(events, "proposal") if p["agent_id"] == "A0"]
+    assert all(p["round"] == 2 for p in props_a0)
+    a1_r1 = next(
+        p for name, p in llm.user_prompts if name == "A1" and "Ronda 1" in p
+    )
+    assert "rechazado" in a1_r1
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "consensus" and end["round"] == 2
+
+
+async def test_voto_por_nombre_de_output_se_rechaza_con_ayuda():
+    sim = make_sim()
+    led = sim.outputs[0]
+    llm = MockLLM(
+        {
+            ("A0", 1): [propose(led.name, "VERDE")],
+            ("A1", 1): [propose(led.id, "VERDE")],
+            ("A0", 2): [propose(led.id, "VERDE")],
+        }
+    )
+    events = await run_engine(sim, llm)
+    inv = find(events, "invalid_proposal")
+    assert len(inv) == 1 and inv[0]["output_id"] == "LED"
+    assert led.id in inv[0]["motivo"]
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "consensus" and end["round"] == 2
+
+
+async def test_voto_sobre_id_desconocido_no_bloquea_consenso():
+    sim = make_sim()
+    led = sim.outputs[0].id
+    llm = MockLLM(
+        {
+            ("A0", 1): [propose("no_existe", "VERDE"), propose(led, "VERDE")],
+            ("A1", 1): [propose(led, "VERDE")],
+        }
+    )
+    events = await run_engine(sim, llm)
+    inv = find(events, "invalid_proposal")
+    assert len(inv) == 1 and inv[0]["output_id"] == "no_existe"
+    assert "no es un output" in inv[0]["motivo"]
+    end = find(events, "simulation_end")[0]
+    assert end["reason"] == "consensus" and end["round"] == 1

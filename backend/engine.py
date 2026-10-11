@@ -203,6 +203,7 @@ class DeliberationEngine:
         output_id = str(call.get("output_id", "")).strip()
         out = outputs.get(output_id)
         if out is None:
+            await self._reject_proposal(agent, call, round, output_id, blackboard)
             return
         raw = call.get("valor")
         valor = sanitize_output(raw, out)
@@ -230,6 +231,54 @@ class DeliberationEngine:
                 "valor": valor,
                 "raw_valor": raw,
                 "justificacion": justificacion,
+            }
+        )
+
+    async def _reject_proposal(
+        self, agent, call: dict, round: int, output_id: str, blackboard: list
+    ) -> None:
+        raw = call.get("valor")
+        inp = next(
+            (i for i in self.sim.inputs if output_id in (i.id, i.name)),
+            None,
+        )
+        if inp is not None:
+            motivo = (
+                f'"{output_id}" es el input "{inp.name}" (telemetría de solo '
+                "lectura), no un output votable"
+            )
+        else:
+            out = next(
+                (o for o in self.sim.outputs if output_id == o.name), None
+            )
+            if out is not None:
+                motivo = (
+                    f'"{output_id}" es el nombre de un output, no su id: '
+                    f'vota usando el id "{out.id}"'
+                )
+            else:
+                motivo = (
+                    f'"{output_id}" no es un output votable: usa el id '
+                    "exacto de los outputs listados"
+                )
+        blackboard.append(
+            {
+                "round": round,
+                "agent_name": agent.name,
+                "output_name": output_id or "(sin id)",
+                "valor": raw,
+                "justificacion": f"voto rechazado: {motivo}",
+            }
+        )
+        await self.emit(
+            {
+                "type": "invalid_proposal",
+                "round": round,
+                "agent_id": agent.id,
+                "agent_name": agent.name,
+                "output_id": output_id,
+                "raw_valor": raw,
+                "motivo": motivo,
             }
         )
 
@@ -313,7 +362,7 @@ class DeliberationEngine:
             "en rondas sucesivas de debate.\n"
             "- En cada turno debes: (1) argumentar brevemente tu postura en texto "
             "y (2) llamar a la herramienta `propose_output` una vez POR CADA "
-            "output.\n"
+            "output, usando su id exacto.\n"
             "- `propose_output` solo registra tu voto en la pizarra compartida; "
             "el orquestador aplica al dispositivo el valor final.\n"
             "- Si todos los agentes proponen el mismo valor para un output, hay "
@@ -321,6 +370,9 @@ class DeliberationEngine:
             f"- Si tras {sim.max_rondas} rondas no hay consenso, se aplica "
             "resolución por mayoría; el empate produce un estado de seguridad "
             "preconfigurado.\n"
+            "- La telemetría (inputs) es de solo lectura: no se vota sobre "
+            "inputs; vota únicamente sobre los outputs listados abajo, usando "
+            "su id exacto.\n"
             "- Tu voto se normaliza: en enums se acepta la opción válida más "
             "cercana, en bools se interpreta true/false, y en texto libre se "
             "recortan espacios.\n\n"

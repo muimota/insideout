@@ -278,6 +278,7 @@
           agent_name: ev.agent_name,
           thought: "",
           proposals: [],
+          rejected: [],
           timeout: false,
         });
         live = {
@@ -335,6 +336,14 @@
         roundLocked[ev.round] = snapshot(locked);
         status = `CONSENSO en ${ev.output_name} = ${ev.valor} (ronda ${ev.round})`;
         break;
+      case "invalid_proposal": {
+        const r = rounds[rounds.length - 1];
+        if (r && r.turns.length) {
+          r.turns[r.turns.length - 1].rejected.push(ev);
+        }
+        status = `Voto rechazado (${ev.agent_name}): ${ev.motivo}`;
+        break;
+      }
       case "forced_resolution":
         deviceValues[ev.output_id] = ev.valor;
         locked[ev.output_id] = { kind: "forced", valor: ev.valor, round: ev.round };

@@ -49,6 +49,17 @@ Capa de orquestación (backend) que gestiona el loop de interacción entre agent
 
 Los agentes **no** tienen acceso directo al hardware (`set_output` se descarta porque rompería la deliberación): la herramienta solo registra el voto en la pizarra.
 
+## Votos inválidos (inputs o ids desconocidos)
+
+`propose_output` con un `output_id` que no es un output **no** se descarta en
+silencio: se emite `invalid_proposal` con el motivo y se anota el rechazo en la
+pizarra para que los turnos siguientes (ventana de `n_mensajes`) lo vean y
+corrijan. Motivos:
+
+- es un **input** (la telemetría es de solo lectura),
+- es el **nombre** de un output (se pide votar usando su id exacto),
+- es un **id desconocido**.
+
 ## Cambios acordados respecto a la propuesta inicial
 
 | Aspecto | Propuesta inicial | Decisión acordada |

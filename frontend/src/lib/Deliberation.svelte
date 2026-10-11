@@ -30,6 +30,15 @@
           {/each}
         </div>
       {/if}
+      {#if t.rejected?.length}
+        <div class="flex flex-col gap-1">
+          {#each t.rejected as p, i (i)}
+            <span class="rounded-md bg-timeout px-2 py-[0.3rem] text-[0.88rem] text-warn">
+              voto rechazado: {p.output_id || "(sin id)"} — {p.motivo}
+            </span>
+          {/each}
+        </div>
+      {/if}
     </article>
   {/each}
 </div>

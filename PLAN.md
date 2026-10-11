@@ -22,6 +22,7 @@ comando final a los dispositivos.
 | Outputs | Enums discretos definidos **explícitamente por el autor del experimento** (ej. LED `["OFF","VERDE","AMBAR","ROJO"]`, servo `[0,45,90]`). Cada output enum tiene `enum_values`, `descripción` y `safe_value` (estado ante conflicto; por defecto el primer valor del enum) |
 | Dispositivos | Abstracción `Device`: fase 1 = **virtuales en el navegador**; fase 3 = ESP32 físico por WebSocket sin cambiar el resto |
 | Consenso | **Unánime por output** → early exit cuando todos los outputs están acordados. Sin unanimidad tras `max_rondas`: **mayoría simple por output; empate o sin mayoría → `safe_value`** (estado de conflicto) |
+| Votos inválidos | `propose_output` sobre un input o id desconocido → evento `invalid_proposal` + nota de rechazo en la pizarra; la telemetría (inputs) es de solo lectura |
 | Motor | Implementación propia en Python asíncrono (~300 líneas). Sin frameworks de agentes |
 | Turnos | Round-robin estricto, `max_rondas = 3`, timeout por turno **configurable** (default 30 s por fiabilidad con LLMs) |
 | Memoria | Pizarra compartida (*blackboard*) con ventana deslizante `n_mensajes_visibles = 4` |
@@ -81,8 +82,8 @@ Por ronda k:
 - `POST /experiment/inputs/{id}/value` — fijar valor de un input.
 - `POST /experiment/start` → stream **SSE** con eventos:
   `round_start`, `telemetry`, `turn_start`, `thought_token` (streaming del
-  razonamiento), `proposal`, `round_end`, `consensus`, `forced_resolution`,
-  `command`, `simulation_end`.
+  razonamiento), `proposal`, `invalid_proposal`, `round_end`, `consensus`,
+  `forced_resolution`, `command`, `simulation_end`.
 
 ## 7. Fases
 
