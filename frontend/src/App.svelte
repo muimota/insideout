@@ -459,7 +459,7 @@
           <button class="btn ml-auto px-2" disabled={busy} onclick={() => call(`/inputs/${inp.id}`, "DELETE")}>×</button>
           <p class="m-0 w-full text-[0.85rem] text-dim">{inp.description}</p>
           {#if inp.tipo === "bool"}
-            <select class="field" value={inp.value} onchange={(e) => setInputValue(inp.id, e.target.value === "true")}>
+            <select class="field" value={String(inp.value ?? false)} onchange={(e) => setInputValue(inp.id, e.target.value === "true")}>
               <option value="false">false</option>
               <option value="true">true</option>
             </select>
