@@ -75,10 +75,12 @@ Se genera al inicio de cada turno individual y contiene:
 
 ---
 
-## 3. La Herramienta del Agente: `propose_output`
+## 3. Las Herramientas del Agente: `propose_output` y `abstain_output`
 
-Los agentes disponen de una única función (`TOOLS_SCHEMA`) provista a través del protocolo de llamadas a herramientas (*tool calling*) de OpenAI:
+Los agentes disponen de dos herramientas formales (`TOOLS_SCHEMA`) provistas a través del protocolo de llamadas a herramientas (*tool calling*) de OpenAI:
 
+### A. Voto Activo: `propose_output`
+Permite proponer un valor para un actuador:
 ```json
 {
   "name": "propose_output",
@@ -88,11 +90,11 @@ Los agentes disponen de una única función (`TOOLS_SCHEMA`) provista a través 
     "properties": {
       "output_id": {
         "type": "string",
-        "description": "Identificador del output sobre el que votas"
+        "description": "Identificador exacto del output sobre el que votas (usa su id, no su nombre)"
       },
       "valor": {
         "type": "string",
-        "description": "Valor propuesto (uno de los valores válidos del output)"
+        "description": "Valor propuesto (uno de los valores válidos del output, o 'ABSTAIN' si decides abstenerte)"
       },
       "justificacion": {
         "type": "string",
@@ -103,6 +105,30 @@ Los agentes disponen de una única función (`TOOLS_SCHEMA`) provista a través 
   }
 }
 ```
+
+### B. Abstención Dinámica: `abstain_output`
+Permite a un agente no emitir voto sobre actuadores que considere fuera de su especialidad, rol o competencia:
+```json
+{
+  "name": "abstain_output",
+  "description": "Indica formalmente que te abstienes de votar sobre este output porque no compete a tu rol, personalidad o especialidad. Permite que los demás agentes decidan sin tu bloqueo.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "output_id": {
+        "type": "string",
+        "description": "Identificador exacto del output sobre el que te abstienes"
+      },
+      "justificacion": {
+        "type": "string",
+        "description": "Motivo por el que consideras que no debes votar sobre este output"
+      }
+    },
+    "required": ["output_id", "justificacion"]
+  }
+}
+```
+*(Nota: también se admite invocar `propose_output` con `valor: "ABSTAIN"` de forma indistinta).*
 
 ---
 
@@ -167,19 +193,23 @@ sequenceDiagram
 
 #### A. Consenso Unánime (Early Exit)
 - Evaluado inmediatamente después de cada turno individual.
-- Se produce cuando **todos** los agentes tienen registrado un voto para el output y el conjunto de valores votados es idéntico: `len(set(votos)) == 1`.
-- Si todos los outputs alcanzan unanimidad, la simulación termina sin agotar las rondas restantes.
+- Se produce cuando **todos** los agentes han participado para el output y no hay discrepancias entre los votos activos:
+  1. **Unanimidad activa**: Todos los agentes que votan coinciden en la misma opción (`len(set(no_abstenidos)) == 1`), independientemente de cuántos agentes hayan elegido abstenerse (`ABSTAIN`).
+  2. **Abstención total**: Si **todos** los agentes deciden abstenerse para un output, hay consenso unánime en no intervenir y el actuador adopta automáticamente su `safe_value`.
+- Si todos los outputs alcanzan consenso, la simulación termina de inmediato sin agotar las rondas restantes.
 
 #### B. Resolución Forzada (Agotamiento de Rondas)
 Si se alcanza `max_rondas` sin unanimidad:
-1. **Mayoría Simple**: Se contabilizan los votos vigentes de cada agente. Si una opción supera en votos a la segunda más votada, resulta elegida.
-2. **Empate o Falta de Mayoría**: Si no existe una opción estrictamente mayoritaria (o ningún agente emitió votos válidos), se adopta el **`safe_value`** configurado en el output.
+1. **Mayoría Simple**: Se contabilizan los votos vigentes entre los agentes **no abstenidos**. Si una opción supera en votos a la segunda más votada, resulta elegida.
+2. **Empate, Falta de Mayoría o Abstención Plena**: Si no existe una opción estrictamente mayoritaria entre los votantes (o todos se abstuvieron), se adopta el **`safe_value`** configurado en el output.
 
 #### C. Modo Agente Único (Monoagente)
 Cuando la simulación cuenta con un único agente:
 - No se aplica la lógica de consenso ni mayorías.
-- El agente es informado en su prompt de que decide en solitario.
-- En cuanto emite su propuesta para todos los outputs, la simulación concluye con eventos `decision` (`via: "voto"`).
+- El agente es informado en su prompt de que decide en solitario y puede proponer un valor o abstenerse.
+- En cuanto emite su postura para todos los outputs, la simulación concluye con eventos `decision`:
+  - Si votó una opción: `via: "voto"`.
+  - Si se abstuvo: adopta `safe_value` con `via: "abstencion"`.
 - Si omite algún output tras agotar las rondas, este toma su `safe_value` (`via: "safe_value"`).
 
 ---
