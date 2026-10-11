@@ -1,12 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-base: #14181c;
+  --color-panel: #1a1e22;
+  --color-inner: #161a1d;
+  --color-live: #14181b;
+  --color-field: #12161a;
+  --color-proposal: #22282d;
+  --color-edge: #2c3237;
+  --color-edge-strong: #3a4147;
+  --color-toggle: #3a3f44;
+  --color-knob: #f0f3f5;
+  --color-on: #2ecc71;
+  --color-accent: #46b06a;
+  --color-accent-deep: #2f6f4f;
+  --color-warn: #f1c40f;
+  --color-danger: #e74c3c;
+  --color-danger-soft: #f5b8bc;
+  --color-danger-deep: #4a1f24;
+  --color-warn-deep: #4a3d1e;
+  --color-timeout: #5a3d1e;
+  --color-forced: #2a2418;
+  --color-consensus: #1f4a33;
+  --color-unanimous: #1a2a22;
+  --color-raw: #d08770;
+  --color-ink: #e8edf2;
+  --color-soft: #9fb3c8;
+  --color-body: #cdd6df;
+  --color-dim: #6b7681;
+  --color-dim2: #8b98a5;
+
+  --animate-caretblink: caretblink 1s steps(2) infinite;
+  @keyframes caretblink {
+    to { opacity: 0; }
+  }
+  --animate-dot: dot 1.2s infinite;
+  @keyframes dot {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
+}
+
 :root {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: dark;
-  background: #14181c;
-  color: #e8edf2;
+  background: var(--color-base);
+  color: var(--color-ink);
   line-height: 1.5;
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
+@layer components {
+  .btn {
+    @apply cursor-pointer rounded-md border border-edge-strong bg-edge px-4 py-[0.45rem] text-[0.9rem] text-ink select-none disabled:opacity-[0.45] disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply border-accent bg-accent-deep font-bold;
+  }
+  .field {
+    @apply rounded-md border border-edge-strong bg-field px-2 py-[0.4rem] text-[0.9rem] text-ink;
+  }
+  .card {
+    @apply bg-panel border border-edge rounded-[10px] p-4;
+  }
 }

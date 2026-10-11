@@ -44,7 +44,8 @@ code/
 ├── frontend/                 # Svelte + Vite
 │   ├── src/App.svelte        # builder: crear agentes/inputs/outputs, fijar valores, play
 │   ├── src/Deliberation.svelte   # razonamiento por agente (streaming), votos, timeline
-│   └── src/VirtualDevices.svelte # LED (color), servo (dial), nivel (barra)
+│   └── src/VirtualDevices.svelte # badge genérico de valor, toggle (bool), texto
+│                                 # estilos: Tailwind v4 utilidades (@theme en app.css)
 ├── tests/                    # pytest: motor con LLM mockeado
 ├── .env.example
 └── PLAN.md

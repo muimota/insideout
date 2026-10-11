@@ -15,55 +15,74 @@
     if (vals.some((v) => v == null)) return false;
     return new Set(vals.map(String)).size === 1;
   }
+
+  function thClasses(lockKind) {
+    const base = "border border-edge px-[0.6rem] py-[0.45rem] text-left align-top font-semibold";
+    const ring = lockKind === "consensus" ? " shadow-[inset_0_0_0_1px_#2ecc71]" : "";
+    return `${base} bg-panel text-body${ring}`;
+  }
+
+  function tdClasses(uni, lockKind) {
+    const base = "border border-edge px-[0.6rem] py-[0.45rem] text-left align-top";
+    let bg = "bg-inner";
+    if (lockKind === "consensus") bg = "bg-inner shadow-[inset_0_0_0_1px_#2ecc71]";
+    else if (lockKind === "forced") bg = "bg-forced";
+    else if (uni) bg = "bg-unanimous";
+    return `${base} ${bg}`;
+  }
 </script>
 
-<div class="board">
+<div class="overflow-x-auto">
   {#if live}
-    <div class="liveonair">
-      <span class="who">🗣 {live.agent_name} · ronda {live.round}</span>
+    <div class="mb-[0.6rem] rounded-lg border border-edge bg-live px-[0.7rem] py-2">
+      <span class="text-[0.75rem] font-semibold text-accent">🗣 {live.agent_name} · ronda {live.round}</span>
       {#if live.text}
-        <p class="stream">{live.text}<span class="caret"></span></p>
+        <p class="mt-1 font-mono text-[0.85rem] whitespace-pre-wrap text-body">{live.text}<span class="inline-block h-[1em] w-[0.55em] animate-caretblink bg-accent align-text-bottom"></span></p>
       {/if}
     </div>
   {/if}
-  <table>
+  <table class="w-full border-collapse text-[0.9rem]">
     <thead>
       <tr>
-        <th>Output</th>
+        <th class="border border-edge bg-panel px-[0.6rem] py-[0.45rem] text-left align-top font-semibold text-soft">Output</th>
         {#each agents as a (a.id)}
-          <th>{a.name}</th>
+          <th class="border border-edge bg-panel px-[0.6rem] py-[0.45rem] text-left align-top font-semibold text-soft">{a.name}</th>
         {/each}
-        <th>Estado</th>
+        <th class="border border-edge bg-panel px-[0.6rem] py-[0.45rem] text-left align-top font-semibold text-soft">Estado</th>
       </tr>
     </thead>
     <tbody>
       {#each outputs as o (o.id)}
         {@const uni = unanimous(o.id)}
         {@const lock = locked[o.id]}
-        <tr class:unanimous={uni} class:consensus={lock?.kind === "consensus"} class:forced={lock?.kind === "forced"}>
-          <th>{o.name}</th>
+        <tr>
+          <th class={thClasses(lock?.kind)}>{o.name}</th>
           {#each agents as a (a.id)}
             {@const c = cell(o.id, a.id)}
-            <td class:changed={c?.from != null} title={c?.justificacion || ""}>
+            <td class={tdClasses(uni, lock?.kind)} title={c?.justificacion || ""}>
               {#if c}
-                <strong>{c.valor}</strong>
+                <strong class={c.from != null ? "text-warn" : ""}>{c.valor}</strong>
                 {#if c.from != null}
-                  <span class="flip">{c.from} → {c.valor}</span>
+                  <span class="mt-[0.15rem] block text-[0.75rem] text-warn">{c.from} → {c.valor}</span>
                 {/if}
                 {#if c.raw != null && String(c.raw) !== String(c.valor)}
-                  <span class="intent raw">intención: {c.raw}</span>
+                  <span class="block text-[0.75rem] italic text-raw">intención: {c.raw}</span>
                 {/if}
                 {#if c.justificacion}
-                  <p class="intent">{c.justificacion}</p>
+                  <p class="mt-1 overflow-hidden text-[0.75rem] text-dim2 line-clamp-3">{c.justificacion}</p>
                 {/if}
               {:else if live?.agent_id === a.id}
-                <span class="thinking"><i></i><i></i><i></i></span>
+                <span class="thinking flex gap-1">
+                  <i class="inline-block h-[0.35rem] w-[0.35rem] animate-dot rounded-full bg-accent"></i>
+                  <i class="inline-block h-[0.35rem] w-[0.35rem] animate-dot rounded-full bg-accent [animation-delay:0.2s]"></i>
+                  <i class="inline-block h-[0.35rem] w-[0.35rem] animate-dot rounded-full bg-accent [animation-delay:0.4s]"></i>
+                </span>
               {:else}
-                <span class="empty">—</span>
+                <span class="text-dim">—</span>
               {/if}
             </td>
           {/each}
-          <td class="state">
+          <td class="border border-edge bg-inner px-[0.6rem] py-[0.45rem] text-left align-top whitespace-nowrap text-[0.8rem] text-soft">
             {#if lock?.kind === "consensus"}
               consenso · ronda {lock.round}
             {:else if lock?.kind === "forced"}
@@ -79,131 +98,3 @@
     </tbody>
   </table>
 </div>
-
-<style>
-  .board {
-    overflow-x: auto;
-  }
-  .liveonair {
-    border: 1px solid #2c3237;
-    background: #14181b;
-    border-radius: 8px;
-    padding: 0.5rem 0.7rem;
-    margin-bottom: 0.6rem;
-  }
-  .who {
-    font-size: 0.75rem;
-    color: #46b06a;
-    font-weight: 600;
-  }
-  .stream {
-    margin: 0.25rem 0 0;
-    font-family: monospace;
-    font-size: 0.85rem;
-    color: #cdd6df;
-    white-space: pre-wrap;
-  }
-  .caret {
-    display: inline-block;
-    width: 0.55em;
-    height: 1em;
-    background: #46b06a;
-    vertical-align: text-bottom;
-    animation: blink 1s steps(2) infinite;
-  }
-  @keyframes blink {
-    to {
-      opacity: 0;
-    }
-  }
-  .thinking i {
-    display: inline-block;
-    width: 0.35rem;
-    height: 0.35rem;
-    margin-right: 0.25rem;
-    border-radius: 50%;
-    background: #46b06a;
-    animation: pulse 1.2s infinite;
-  }
-  .thinking i:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-  .thinking i:nth-child(3) {
-    animation-delay: 0.4s;
-  }
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 0.2;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
-  }
-  th,
-  td {
-    border: 1px solid #2c3237;
-    padding: 0.45rem 0.6rem;
-    text-align: left;
-    vertical-align: top;
-  }
-  thead th {
-    color: #9fb3c8;
-    font-weight: 600;
-    background: #1a1e22;
-  }
-  tbody th {
-    color: #cdd6df;
-    font-weight: 600;
-    background: #1a1e22;
-  }
-  td {
-    background: #161a1d;
-  }
-  tr.unanimous td {
-    background: #1a2a22;
-  }
-  tr.consensus td,
-  tr.consensus th {
-    box-shadow: inset 0 0 0 1px #2ecc71;
-  }
-  tr.forced td {
-    background: #2a2418;
-  }
-  .changed strong {
-    color: #f1c40f;
-  }
-  .flip {
-    display: block;
-    margin-top: 0.15rem;
-    font-size: 0.75rem;
-    color: #f1c40f;
-  }
-  .intent {
-    margin: 0.25rem 0 0;
-    font-size: 0.75rem;
-    color: #8b98a5;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .intent.raw {
-    display: block;
-    color: #d08770;
-    font-style: italic;
-  }
-  .empty {
-    color: #6b7681;
-  }
-  .state {
-    color: #9fb3c8;
-    white-space: nowrap;
-    font-size: 0.8rem;
-  }
-</style>
