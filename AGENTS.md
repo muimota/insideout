@@ -284,6 +284,35 @@ class Device(ABC):
 - **Fase Actual (`VirtualDevice`)**: Traduce la llamada `apply(valor)` en un evento SSE `command` que el frontend refleja visualmente (conmutadores booleanos, displays de texto o badges para enums).
 - **Extensibilidad a Hardware Físico**: Para conectar actuadores reales (como un microcontrolador ESP32 gobernando un servo o tira LED RGB), basta con crear una subclase `PhysicalESP32Device(Device)` que envíe el comando vía WebSocket o MQTT, sin necesidad de alterar una sola línea del motor de deliberación.
 
+### 7.1 Puente Hardware desde el Navegador (WebSerial)
+
+Vía alternativa ya implementada, que **no requiere ningún cambio en el backend**: el hardware habla directamente con el navegador por USB mediante la [WebSerial API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API) (Chrome/Edge, en `localhost` o HTTPS). Sigue la filosofía Firmata: firmware 100 % genérico en la placa y toda la lógica de mapeo en el host.
+
+```
+Navegador (Chrome/Edge)
+ ├── SSE  ◄── eventos "command" ───────── backend (sin cambios)
+ ├── REST ──► POST /inputs/{id}/value ──► backend (sin cambios)
+ └── WebSerial ──USB──► Arduino/ESP32 (firmware genérico lab_serial)
+```
+
+**Componentes:**
+
+| Pieza | Fichero | Rol |
+| :--- | :--- | :--- |
+| Firmware genérico | `firmware/lab_serial/lab_serial.ino` | Expone pines por serie (115200) con un protocolo de líneas de texto: `HELLO`, `PM`, `DW`, `AW`, `SV`, `DR`, `AR`, `WATCH`, `UNWATCH`. Compatible AVR y ESP32 (core 3.x + librería ESP32Servo). |
+| Transporte | `frontend/src/lib/hardware/serialBridge.js` | WebSerial puro: abre el puerto, envía órdenes y emite lecturas `IN <pin> <valor>`. Sin dependencias de Svelte. |
+| Estado y mapeo | `frontend/src/lib/hardware/hwStore.svelte.js` | Bindings pin ↔ input/output (persistidos en `localStorage`), mapeo valor lógico ↔ eléctrico y anti-rebote de sensores. |
+| Panel de control | `frontend/src/lib/HardwarePanel.svelte` | UI para conectar la placa y vincular/desvincular pines. |
+
+**Flujo de outputs (actuadores):** el motor emite `command` → el frontend lo refleja en el dispositivo virtual y, si el output tiene binding, `hwApplyCommand()` envía la orden serie (`bool→DW`, `enum numérico→SV/AW`).
+
+**Flujo de inputs (sensores):** `WATCH` hace que la placa avise al cambiar → el store mapea la lectura al valor lógico del input (`digital/pullup→bool`, `analógico→valor del enum más cercano`) → POST silencioso a `/experiment/inputs/{id}/value`. El motor sigue congelando la telemetría al inicio de cada ronda, sin cambios.
+
+**Tipos vinculables:** `bool` (digital/pullup), `enum numérico` (servo, PWM, analógico). Los `texto` y enums de texto permanecen solo virtuales.
+
+> [!NOTE]
+> La vinculación pin ↔ variable es local de cada navegador (localStorage): cada alumno puede conectar su propia placa a su puesto sin afectar al backend compartido.
+
 ---
 
 ## 8. Entorno de Pruebas y Desarrollo sin Coste de API

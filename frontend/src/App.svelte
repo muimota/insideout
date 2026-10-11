@@ -3,6 +3,8 @@
   import VirtualDevices from "./lib/VirtualDevices.svelte";
   import Deliberation from "./lib/Deliberation.svelte";
   import VoteBoard from "./lib/VoteBoard.svelte";
+  import HardwarePanel from "./lib/HardwarePanel.svelte";
+  import { setHwInputSink, hwApplyCommand } from "./lib/hardware/hwStore.svelte.js";
 
   const API = "http://localhost:8000";
 
@@ -31,7 +33,27 @@
     description: "",
   });
 
-  onMount(load);
+  onMount(() => {
+    setHwInputSink(pushPhysicalInput);
+    load();
+  });
+
+  // Un sensor físico empuja un nuevo valor de input: reflejo inmediato en
+  // la UI y POST silencioso (sin busy ni recarga) para no bloquear nada.
+  async function pushPhysicalInput(id, value) {
+    const inp = inputs.find((i) => i.id === id);
+    if (!inp) return;
+    inp.value = value;
+    try {
+      await fetch(`${API}/experiment/inputs/${id}/value`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value }),
+      });
+    } catch {
+      /* si falla el POST, el valor local ya quedó reflejado */
+    }
+  }
 
   async function load() {
     const res = await fetch(`${API}/experiment`);
@@ -329,6 +351,7 @@
       }
       case "command":
         deviceValues[ev.output_id] = ev.valor;
+        hwApplyCommand(ev.output_id, ev.valor);
         break;
       case "consensus":
         deviceValues[ev.output_id] = ev.valor;
@@ -522,6 +545,10 @@
         <button class="btn" onclick={addOutput} disabled={busy}>+ Output</button>
       </div>
     </div>
+  </section>
+
+  <section class="mt-4">
+    <HardwarePanel {inputs} {outputs} />
   </section>
 
   <section>
