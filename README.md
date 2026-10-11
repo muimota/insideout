@@ -46,7 +46,9 @@ Abre http://localhost:5173
 
 ### 4. Uso
 
-1. Crea uno o más **agentes** (solo el prompt de personalidad).
+1. Crea uno o más **agentes** (solo el prompt de personalidad). Arrástralos
+   en la lista para reordenar los turnos y haz doble click sobre su
+   personalidad para editarla.
 2. Crea **inputs** (bool/enum/texto) y fija su valor antes de jugar.
 3. Crea **outputs** del mismo modo (bool/enum/texto); los enum muestran un
    badge con el valor del actuador virtual.

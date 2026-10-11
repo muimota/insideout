@@ -101,6 +101,38 @@ def create_agent(body: AgentCreate):
     return agent
 
 
+class AgentOrder(BaseModel):
+    ids: list[str]
+
+
+@app.put("/agents/order")
+def reorder_agents(body: AgentOrder):
+    pos = {aid: i for i, aid in enumerate(body.ids)}
+    state["agents"].sort(key=lambda a: pos.get(a.id, len(body.ids)))
+    return {"ok": True}
+
+
+class AgentUpdate(BaseModel):
+    name: Optional[str] = None
+    personality: Optional[str] = None
+
+
+@app.put("/agents/{agent_id}")
+def update_agent(agent_id: str, body: AgentUpdate):
+    agent = next((a for a in state["agents"] if a.id == agent_id), None)
+    if agent is None:
+        raise HTTPException(404, "Agente no encontrado")
+    if body.name is not None:
+        if not body.name.strip():
+            raise HTTPException(400, "El nombre no puede estar vacío")
+        agent.name = body.name.strip()
+    if body.personality is not None:
+        if not body.personality.strip():
+            raise HTTPException(400, "La personalidad no puede estar vacía")
+        agent.personality = body.personality.strip()
+    return agent
+
+
 @app.delete("/agents/{agent_id}")
 def delete_agent(agent_id: str):
     state["agents"] = [a for a in state["agents"] if a.id != agent_id]
