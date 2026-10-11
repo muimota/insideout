@@ -21,9 +21,13 @@
           {#each t.proposals as p (p.output_id)}
             <span class="rounded-md bg-proposal px-2 py-[0.3rem] text-[0.88rem]">
               {p.output_name} =
-              <strong>{p.valor}</strong>
-              {#if String(p.raw_valor) !== String(p.valor)}
-                <em class="text-dim">(sanitizado de "{p.raw_valor}")</em>
+              {#if p.valor === "ABSTAIN"}
+                <em class="font-mono text-dim font-semibold italic">abstención</em>
+              {:else}
+                <strong>{p.valor}</strong>
+                {#if String(p.raw_valor) !== String(p.valor)}
+                  <em class="text-dim">(sanitizado de "{p.raw_valor}")</em>
+                {/if}
               {/if}
               — {p.justificacion}
             </span>

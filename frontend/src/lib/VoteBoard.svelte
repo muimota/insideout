@@ -11,7 +11,9 @@
     if (agents.length < 2) return false;
     const vals = agents.map((a) => votes[outputId]?.[a.id]?.valor);
     if (vals.some((v) => v == null)) return false;
-    return new Set(vals.map(String)).size === 1;
+    const nonAbstain = vals.filter((v) => v !== "ABSTAIN");
+    if (nonAbstain.length === 0) return true;
+    return new Set(nonAbstain.map(String)).size === 1;
   }
 
   function thClasses(lockKind) {
@@ -63,11 +65,17 @@
             {@const c = votes[o.id]?.[a.id]}
             <td class={tdClasses(uni, lock?.kind)} title={c?.justificacion || ""}>
               {#if c}
-                <strong class={c.from != null ? "text-warn" : ""}>{c.valor}</strong>
-                {#if c.from != null}
-                  <span class="mt-[0.15rem] block text-[0.75rem] text-warn">{c.from} → {c.valor}</span>
+                {#if c.valor === "ABSTAIN"}
+                  <span class="rounded bg-inner px-1.5 py-0.5 font-mono text-[0.78rem] text-dim italic">abstención</span>
+                {:else}
+                  <strong class={c.from != null ? "text-warn" : ""}>{c.valor}</strong>
                 {/if}
-                {#if c.raw != null && String(c.raw) !== String(c.valor)}
+                {#if c.from != null}
+                  <span class="mt-[0.15rem] block text-[0.75rem] text-warn">
+                    {c.from === "ABSTAIN" ? "abstención" : c.from} → {c.valor === "ABSTAIN" ? "abstención" : c.valor}
+                  </span>
+                {/if}
+                {#if c.raw != null && String(c.raw) !== String(c.valor) && c.valor !== "ABSTAIN"}
                   <span class="block text-[0.75rem] italic text-raw">intención: {c.raw}</span>
                 {/if}
                 {#if c.justificacion}
@@ -90,13 +98,17 @@
             {:else if lock?.kind === "decision"}
               {#if lock.via === "safe_value"}
                 decidido → {lock.valor} (estado de seguridad)
+              {:else if lock.via === "abstencion"}
+                decidido → {lock.valor} (por abstención)
               {:else}
                 decidido · ronda {lock.round}
               {/if}
             {:else if lock?.kind === "forced"}
               forzado → {lock.valor}
             {:else if agents.length === 1}
-              {#if votes[o.id]?.[agents[0].id]}
+              {#if votes[o.id]?.[agents[0].id]?.valor === "ABSTAIN"}
+                abstenido
+              {:else if votes[o.id]?.[agents[0].id]}
                 votado
               {:else}
                 sin voto
