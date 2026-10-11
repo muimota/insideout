@@ -1,3 +1,20 @@
+[project]
+name = "laboratorio-deliberacion"
+version = "0.1.0"
+description = "Laboratorio de deliberación multiagente"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "openai>=1.60",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.7",
+    "python-dotenv>=1.0",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]

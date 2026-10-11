@@ -6,7 +6,7 @@ virtuales. Consulta `PLAN.md` (arquitectura y decisiones) y
 
 ## Requisitos
 
-- Python 3.12+
+- Python 3.12+ con [uv](https://docs.astral.sh/uv/)
 - Node.js 20+
 
 ## Puesta en marcha
@@ -29,9 +29,8 @@ N_MENSAJES=4
 ### 2. Backend
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install fastapi 'uvicorn[standard]' openai python-dotenv
-.venv/bin/python -m uvicorn backend.app:app --port 8000
+uv sync
+uv run uvicorn backend.app:app --port 8000
 ```
 
 ### 3. Frontend
@@ -59,7 +58,7 @@ Abre http://localhost:5173
 Puedes probar todo el flujo con un servidor LLM simulado:
 
 ```bash
-.venv/bin/python -m uvicorn --app-dir dev mock_llm_server:app --port 8001
+uv run uvicorn --app-dir dev mock_llm_server:app --port 8001
 ```
 
 Y en `.env`:
@@ -77,8 +76,7 @@ estado de seguridad AMBAR).
 ## Tests
 
 ```bash
-.venv/bin/pip install pytest pytest-asyncio
-.venv/bin/python -m pytest -q
+uv run pytest -q
 ```
 
 Cubren el motor completo con LLM simulado: consenso, mayoría, empate →
