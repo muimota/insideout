@@ -1,5 +1,5 @@
 <script>
-  export let round;
+  let { round } = $props();
 </script>
 
 <div>

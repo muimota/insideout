@@ -1,17 +1,15 @@
 <script>
-  export let agents;
-  export let outputs;
-  export let votes;
-  export let locked;
-  export let live = null;
-
-  function cell(outputId, agentId) {
-    return votes[outputId]?.[agentId] ?? null;
-  }
+  let {
+    agents = [],
+    outputs = [],
+    votes = {},
+    locked = {},
+    live = null,
+  } = $props();
 
   function unanimous(outputId) {
     if (agents.length < 2) return false;
-    const vals = agents.map((a) => cell(outputId, a.id)?.valor);
+    const vals = agents.map((a) => votes[outputId]?.[a.id]?.valor);
     if (vals.some((v) => v == null)) return false;
     return new Set(vals.map(String)).size === 1;
   }
@@ -62,7 +60,7 @@
         <tr>
           <th class={thClasses(lock?.kind)}>{o.name}</th>
           {#each agents as a (a.id)}
-            {@const c = cell(o.id, a.id)}
+            {@const c = votes[o.id]?.[a.id]}
             <td class={tdClasses(uni, lock?.kind)} title={c?.justificacion || ""}>
               {#if c}
                 <strong class={c.from != null ? "text-warn" : ""}>{c.valor}</strong>
@@ -98,7 +96,7 @@
             {:else if lock?.kind === "forced"}
               forzado → {lock.valor}
             {:else if agents.length === 1}
-              {#if cell(o.id, agents[0].id)}
+              {#if votes[o.id]?.[agents[0].id]}
                 votado
               {:else}
                 sin voto

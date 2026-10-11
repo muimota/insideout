@@ -1,6 +1,5 @@
 <script>
-  export let outputs;
-  export let values = {};
+  let { outputs = [], values = {} } = $props();
 </script>
 
 <div class="flex flex-wrap items-start gap-8">
